@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<r:applicationManifest
+   r:appUri="http://YourDomain.com/CallForwarding"
+   xmlns:r="http://schemas.microsoft.com/lcs/2006/05">
+   <r:allowRegistrationBeforeUserServices/>
+   <r:serverFilter roles="ALL"/>
+
+   <!-- handle INVITE requests -->
+   <r:requestFilter methodNames="INVITE" strictRoute="false" registrarGenerated="true" domainSupported="true"/>
+
+   <!-- handle no response. -->
+   <r:responseFilter reasonCodes="NONE"/>
+
+   <!-- Script-only application. -->
+   <r:scriptOnly/>
+
+   <r:splScript><![CDATA[
+
+    //
+    // Filter out irrelevant requests
+    //Log("debugr", 1, "CallForwarding:           *  Inside app.");
+    
+    //
+    //  Process only sipRequests
+    if (!sipRequest)  
+     {
+      //Log("debugr", 1, "* * * * * * * CallForwarding:*  Not a sipRequest. Leaving.");
+      return;  // Message is not our business. Let Lync handle this.
+    }
+
+    //
+    // Avoid processing RE-INVITEs
+    foreach (sessionExpires in GetHeaderValues("Session-Expires")) 
+    {
+        if (ContainsString(sessionExpires, "refresher", true)) 
+        {
+            //Log("debugr", false, "CallForwarding: * Session refreshing invite. Leaving");
+            return;  
+        }
+    }
+
+    //
+    // INVITE is from a mediation server? If not, end processing
+    foreach (userAgent in GetHeaderValues("USER-AGENT")) 
+    {
+        if (! ContainsString(userAgent, "mediation", true)) 
+        {
+            //Log("debugr", false, "CallForwarding: * Request not from Mediation server. Leaving");
+            return;  // Only external requests are of interest!
+        }
+    }
+
+    //Log("debugr", 1, "CallForwarding: * App is processing a request - ", sipRequest.Method);
+
+    //
+    // Build the user@host from the To: header.  (and some other convenient variables)
+    toUri = GetUri(sipRequest.To);
+    toUserAtHost = Concatenate(GetUserName(toUri), "@", GetHostName(toUri));
+    telNum = GetUserName(toUri);
+
+    //
+    // Look for +16467988803@YourDomain.com in the sipRequest object, the destination # that we want to prevent calls going to
+    if ((ContainsString(toUserAtHost, "+12125551212@YourDomain.com", true)) ){   Respond("302","Moved Temporarily","Contact=<sip:PhoneCallGraveyard@YourDomain.com>");    return;}
+    if ((ContainsString(toUserAtHost, "+12125551213@YourDomain.com", true)) ){   Respond("302","Moved Temporarily","Contact=<sip:gbesso@YourDomain.com>");    return;}
+
+
+       
+    // Return initiative to Lync/Default Routing.
+    return;
+
+   ]]></r:splScript>
+</r:applicationManifest>
